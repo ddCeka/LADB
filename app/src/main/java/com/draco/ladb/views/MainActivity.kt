@@ -3,21 +3,20 @@ package com.draco.ladb.views
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.view.*
+import android.view.KeyEvent
+import android.view.Menu
+import android.view.MenuItem
+import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethod
 import android.view.inputmethod.InputMethodManager
 import android.widget.ScrollView
-import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import androidx.core.content.edit
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceManager
 import com.draco.ladb.BuildConfig
@@ -45,28 +44,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupUI() {
-        /* Fix stupid Google edge-to-edge bullshit */
-        ViewCompat.setOnApplyWindowInsetsListener(binding.content) { v, windowInsets ->
-            val systemBarsInsets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
-            val statusBarInsets = windowInsets.getInsets(WindowInsetsCompat.Type.statusBars())
-            windowInsets.getInsets(WindowInsetsCompat.Type.statusBars())
-
-            v.updateLayoutParams<ViewGroup.MarginLayoutParams> {
-                leftMargin = systemBarsInsets.left
-                bottomMargin = systemBarsInsets.bottom
-                rightMargin = systemBarsInsets.right
-                topMargin = systemBarsInsets.top
-            }
-            binding.statusBarBackground.updateLayoutParams {
-                height = statusBarInsets.top
-            }
-
-            WindowInsetsCompat.CONSUMED
-        }
-        supportActionBar!!.elevation = 0f
-        WindowCompat.getInsetsController(window, window.decorView)
-            .isAppearanceLightStatusBars = false
-
         pairDialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.pair_title)
             .setCancelable(false)
@@ -118,7 +95,7 @@ class MainActivity : AppCompatActivity() {
                 binding.outputScrollview.fullScroll(ScrollView.FOCUS_DOWN)
                 binding.command.requestFocus()
                 val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-                imm.showSoftInput(binding.command, InputMethodManager.SHOW_FORCED)
+                imm.showSoftInput(binding.command, InputMethod.SHOW_EXPLICIT)
             }
         }
 
@@ -133,7 +110,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         /* Prepare progress bar, pairing latch, and script executing */
-        viewModel.adb.running.observe(this) { started ->
+        viewModel.adb.started.observe(this) { started ->
             setReadyForInput(started == true)
         }
     }
@@ -157,19 +134,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
         setupUI()
         setupDataListeners()
-
-        /* Ensure we are not running this a second time around */
-        if (viewModel.viewModelHasStartedADB.value != true) {
-            if (viewModel.isPairing.value != true)
-                pairAndStart()
-        }
+        if (viewModel.isPairing.value != true)
+            pairAndStart()
 
         viewModel.piracyCheck(this)
     }
